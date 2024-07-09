@@ -1,0 +1,11 @@
+# ===========================================================================
+# (c) Copyright IBM Corp. 2018, 2024 All Rights Reserved
+# ===========================================================================
+#
+# This .gitattributes file will cause all text files EXCEPT for
+# *.xml, *.dtd, git's .gitattributes and .gitignore
+# files to be encoded as EBCDIC.
+# Selected binary files will not be translated at all.
+
+# The default for text files
+* git-encoding=iso8859-1 working-tree-encoding=ibm-1047
