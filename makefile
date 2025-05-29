@@ -38,8 +38,15 @@ endif
 
 UNAME := uname
 UNAME_OS := $(shell $(UNAME) -s | cut -f1 -d_)
+$(info UNAME_OS is $(UNAME_OS))
 ifeq ($(findstring CYGWIN,$(UNAME_OS)), CYGWIN)
 	LIB_DIR:=$(shell cygpath -w $(LIB_DIR))
+else ifeq ($(UNAME_OS),OS/390)
+# set -Dfile.encoding=COMPAT for JDK21+ zOS for now
+ifeq ($(shell test $(JDK_VERSION) -ge 21; echo $$?),0)
+export IBM_JAVA_OPTIONS="-Dfile.encoding=COMPAT"
+$(info export IBM_JAVA_OPTIONS="-Dfile.encoding=COMPAT")
+endif
 endif
 
 export LIB_DIR:=$(subst \,/,$(LIB_DIR))
