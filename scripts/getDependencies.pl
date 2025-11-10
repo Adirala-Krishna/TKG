@@ -181,13 +181,6 @@ my %base = (
 		shafn => 'jtreg_7_5_1_1.tar.gz.sha256sum.txt',
 		shaalg => '256'
 	},
-	jtreg_7_5_2_1 => {
-		url => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/jtreg/jtreg-7.5.2+1.tar.gz',
-		fname => 'jtreg_7_5_2_1.tar.gz',
-		shaurl => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/jtreg/jtreg-7.5.2+1.tar.gz.sha256sum.txt',
-		shafn => 'jtreg_7_5_2_1.tar.gz.sha256sum.txt',
-		shaalg => '256'
-	},
 	jtreg_8_2 => {
 		url => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/jtreg/jtreg-8+2.tar.gz',
 		fname => 'jtreg_8_2.tar.gz',
@@ -277,7 +270,7 @@ my %system_jars = (
 		is_system_test => 1
 	},
 	mauve => {
-		url => 'https://ci.adoptium.net/job/systemtest.getDependency/lastSuccessfulBuild/artifact/systemtest_prereqs/mauve/mauve.jar',
+		url => 'https://github.com/adoptium/aqa-triage-data/blob/main/AQAvit/mauve.jar',
 		dir => 'mauve',
 		fname => 'mauve.jar',
 		is_system_test => 1
