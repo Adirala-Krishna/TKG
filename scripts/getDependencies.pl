@@ -70,7 +70,7 @@ my %base = (
 		sha1 => '535f141f6c8fc65986a3469839a852a3266d1025'
 	},
 	asm => {
-		url => 'https://repository.ow2.org/nexus/content/repositories/releases/org/ow2/asm/asm/9.0-beta/asm-9.0-beta.jar',
+		url => 'https://repo1.maven.org/maven2/org/ow2/asm/asm/9.0-beta/asm-9.0-beta.jar',
 		fname => 'asm.jar',
 		sha1 => 'a0f58cad836a410f6ba133aaa209aea7e54aaf8a'
 	},
@@ -125,9 +125,9 @@ my %base = (
 		sha1 => 'bfcb96281ea3b59d626704f74bc6d625ff51cbce'
 	},
 	asmtools => {
-		url => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/asmtools/asmtools-core-7.0.b10-ea.jar',
+		url => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/asmtools/asmtools-9.0.b14-ea.jar',
 		fname => 'asmtools.jar',
-		shaurl => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/asmtools/asmtools-core-7.0.b10-ea.jar.sha256sum.txt',
+		shaurl => 'https://ci.adoptium.net/job/dependency_pipeline/lastSuccessfulBuild/artifact/asmtools/asmtools-9.0.b14-ea.jar.sha256sum.txt',
 		shafn => 'asmtools.jar.sha256sum.txt',
 		shaalg => '256'
 	},
@@ -234,9 +234,10 @@ my %system_jars = (
 		is_system_test => 1
 	},
 	asm => {
-		url => 'https://repository.ow2.org/nexus/content/repositories/releases/org/ow2/asm/asm/9.0/asm-9.0.jar',
+		url => 'https://repo1.maven.org/maven2/org/ow2/asm/asm/9.0/asm-9.0.jar',
 		dir => 'asm',
 		fname => 'asm.jar',
+		sha1 => 'af582ff60bc567c42d931500c3fdc20e0141ddf9',
 		is_system_test => 1
 	},
 	cvsclient => {
@@ -276,16 +277,18 @@ my %system_jars = (
 		is_system_test => 1
 	},
 	tools => {
-		url => 'https://ci.adoptium.net/job/systemtest.getDependency/lastSuccessfulBuild/artifact/systemtest_prereqs/tools/tools.jar',
+		url => 'https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot/normal/adoptium',
 		dir => 'tools',
 		fname => 'tools.jar',
 		is_system_test => 1
 	});
 
 my %jars_to_use;
-if ($path =~ /system_lib/) {
+if ($path =~ /system_lib/ || (exists($ENV{"BUILD_TYPE"}) && $ENV{"BUILD_TYPE"} eq "systemtest")) {
+	print "System Test jars will be downloaded.\n";
 	%jars_to_use = %system_jars;
 } else {
+	print "System Test jars will not be downloaded.\n";
 	%jars_to_use = %base;
 }
 my @dependencies = split(',', $dependencyList);
@@ -314,6 +317,13 @@ if ($task eq "clean") {
 		my $sha1 = $jars_info[$i]{sha1};
 		my $dir = $jars_info[$i]{dir} // "";
 		my $full_dir_path = File::Spec->catdir($path, $dir);
+		if (exists($ENV{"BUILD_TYPE"}) && $ENV{"BUILD_TYPE"} eq "systemtest") {
+			$full_dir_path = File::Spec->catdir($path, "systemtest_prereqs" , $dir);
+			if ($fn eq "tools.jar") {
+				toolsJarDownloader("$full_dir_path", "$url");
+				next;
+			}
+		}
 		my $url_custom = $customUrl;
 
 		if (!-d $full_dir_path) {
@@ -417,6 +427,19 @@ if ($task eq "clean") {
 	die "ERROR: task unsatisfied!\n";
 }
 
+# The tools jar is stored within another jar (a JDK) which is accessed indirectly via an api.
+# This subroutine will access the api, download the outer jar, and extract the tools.jar.
+sub toolsJarDownloader {
+	my ( $dir, $url ) = @_;
+	print "Checksum verification skipped for systemtest_prereqs/tools/tools.jar \n";
+	print "downloading $url \n";
+	qx{_ENCODE_FILE_NEW=BINARY curl -LfsS --create-dirs -o "$dir/jdk8/jdk8.tar.gz" $url 2>&1};
+	qx{tar --directory "$dir/jdk8" -xzf "$dir/jdk8/jdk8.tar.gz" --strip-components 1};
+	qx{cp "$dir/jdk8/lib/tools.jar" "$dir"};
+	qx{rm -rf "$dir/jdk8"};
+	print "file downloaded to $dir/tools.jar \n";
+}
+
 sub getShaFromFile {
 	my ( $shafile, $fn ) = @_;
 	my $sha = "";
@@ -441,16 +464,24 @@ sub downloadFile {
 		qx(rm $filename);
 	}
 
-	# .txt SHA files are in ISO8859-1
-	# note _ENCODE_FILE_NEW flag is set for zos
-	if ('.txt' eq substr $filename, -length('.txt')) {
-		$output = qx{_ENCODE_FILE_NEW=ISO8859-1 curl $curlOpts -k -o $filename $url 2>&1};
-	} elsif ('.jar' eq substr $filename, -length('.jar')) {
-		$output = qx{_ENCODE_FILE_NEW=BINARY curl $curlOpts -k -o $filename $url 2>&1};
-	} else {
-		$output = qx{_ENCODE_FILE_NEW=UNTAGGED curl $curlOpts -k -o $filename $url 2>&1};
+	my $returnCode = 99;
+	my $download_attempts = 0;
+	while ($returnCode != 0 && $download_attempts < 10) {
+		$download_attempts++;
+		print "download attempt $download_attempts for $url\n";
+		# .txt SHA files are in ISO8859-1
+		# note _ENCODE_FILE_NEW flag is set for zos
+		if ('.txt' eq substr $filename, -length('.txt')) {
+			$output = qx{_ENCODE_FILE_NEW=ISO8859-1 curl $curlOpts -k -o $filename $url 2>&1};
+		} elsif ('.jar' eq substr $filename, -length('.jar')) {
+			$output = qx{_ENCODE_FILE_NEW=BINARY curl $curlOpts -k -o $filename $url 2>&1};
+		} else {
+			$output = qx{_ENCODE_FILE_NEW=UNTAGGED curl $curlOpts -k -o $filename $url 2>&1};
+		}
+		$returnCode = $?;
+		last if $returnCode == 0;
 	}
-	my $returnCode = $?;
+
 	if ($returnCode == 0) {
 		print "--> file downloaded to $filename\n";
 	} else {
