@@ -118,8 +118,13 @@
 	</target>
 
 	<target name="getDependentLibs" unless="skipDependency">
-		<exec executable="perl" failonerror="true">
-			<arg line="${TEST_ROOT}/TKG/scripts/getDependencies.pl -path ${LIB_DIR} -task default -dependencyList ${LIB}"/>
-		</exec>
+		<exec executable="/usr/bin/perl" failonerror="true">
+    	<arg value="${TEST_ROOT}/TKG/scripts/getDependencies.pl"/>
+    	<arg value="-path"/>
+    	<arg value="${LIB_DIR}"/>
+    	<arg value="-task"/>
+    	<arg value="default"/>
+    	<arg value="default"/>
+	    </exec>
 	</target>
 </project>
